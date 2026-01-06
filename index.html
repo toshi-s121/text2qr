@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Text2QR - 長文分割対応</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- QR Code Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+    <!-- Google Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap"
+        rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+            background-color: #f8fafc;
+        }
+
+        .notch-safe {
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+
+        /* スクロールバー非表示（スッキリさせるため） */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+
+<body class="notch-safe min-h-screen text-slate-800 flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-50">
+        <div class="max-w-md mx-auto px-4 h-14 flex items-center justify-between">
+            <h1 class="text-lg font-bold flex items-center gap-2 text-slate-800">
+                <i data-lucide="qr-code" class="w-5 h-5 text-indigo-600"></i>
+                Text2QR
+            </h1>
+            <div class="text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-1 rounded">長文対応</div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-md mx-auto w-full p-4 space-y-6">
+
+        <!-- Input Area -->
+        <section class="space-y-2">
+            <label class="block text-sm font-bold text-slate-700 flex justify-between items-end">
+                <span>テキストを入力</span>
+                <span id="char-count" class="text-xs text-slate-400 font-normal">0 文字</span>
+            </label>
+            <div class="relative group">
+                <textarea id="text-input" rows="4"
+                    class="w-full text-base bg-white border-2 border-slate-200 rounded-xl p-4 focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50/50 transition resize-none shadow-sm"
+                    placeholder="ここに文章を貼り付けてください..."></textarea>
+                <div class="absolute bottom-3 right-3 flex gap-2">
+                    <button onclick="pasteText()"
+                        class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-2 py-1 rounded flex items-center gap-1 transition">
+                        <i data-lucide="clipboard" class="w-3 h-3"></i> ペースト
+                    </button>
+                    <button onclick="clearText()"
+                        class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-2 py-1 rounded flex items-center gap-1 transition">
+                        <i data-lucide="x" class="w-3 h-3"></i> クリア
+                    </button>
+                </div>
+            </div>
+            <p class="text-xs text-slate-400">
+                <i data-lucide="info" class="w-3 h-3 inline align-middle mr-0.5"></i>
+                約500文字を超えると、自動的に複数のQRコードに分割されます。
+            </p>
+        </section>
+
+        <!-- Generate Button -->
+        <button onclick="generateQR()"
+            class="w-full bg-indigo-600 text-white font-bold h-12 rounded-xl shadow-lg shadow-indigo-200 active:scale-[0.98] transition flex items-center justify-center gap-2 text-lg">
+            <i data-lucide="refresh-cw" class="w-5 h-5"></i>
+            QRコード生成
+        </button>
+
+        <!-- Result Area -->
+        <section id="result-area" class="hidden space-y-4 pb-10">
+            <div class="flex items-center gap-2 px-1">
+                <span class="h-px bg-slate-200 flex-1"></span>
+                <span class="text-xs font-bold text-slate-400">GENERATED</span>
+                <span class="h-px bg-slate-200 flex-1"></span>
+            </div>
+
+            <div id="qr-container" class="space-y-6">
+                <!-- JSでここにQRカードを追加 -->
+            </div>
+
+            <div class="text-center">
+                <p class="text-xs text-slate-400 mb-2">QRコードを長押しして画像を保存できます</p>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        // --- Config ---
+        const MAX_CHARS_PER_QR = 500; // ユーザー要望により500文字に変更
+
+        // --- Elements ---
+        const textInput = document.getElementById('text-input');
+        const charCount = document.getElementById('char-count');
+        const resultArea = document.getElementById('result-area');
+        const qrContainer = document.getElementById('qr-container');
+
+        // --- Event Listeners ---
+        textInput.addEventListener('input', updateCount);
+
+        // --- Logic ---
+        function updateCount() {
+            const len = textInput.value.length;
+            charCount.textContent = `${len} 文字`;
+
+            // 簡易的な自動生成（入力が止まったら...は今回は省略、UX向上のためボタン起動にする）
+        }
+
+        async function pasteText() {
+            try {
+                const text = await navigator.clipboard.readText();
+                textInput.value = text;
+                updateCount();
+            } catch (err) {
+                alert('クリップボードへのアクセスが許可されていません');
+            }
+        }
+
+        function clearText() {
+            textInput.value = '';
+            updateCount();
+            resultArea.classList.add('hidden');
+            qrContainer.innerHTML = '';
+        }
+
+        function generateQR() {
+            const text = textInput.value.trim();
+            if (!text) {
+                alert('テキストを入力してください');
+                return;
+            }
+
+            // Reset
+            qrContainer.innerHTML = '';
+            resultArea.classList.remove('hidden');
+
+            const chunks = splitText(text, MAX_CHARS_PER_QR);
+
+            chunks.forEach((chunk, index) => {
+                createQRCard(chunk, index + 1, chunks.length);
+            });
+
+            lucide.createIcons();
+
+            // Scroll to result
+            resultArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function splitText(text, chunkSize) {
+            const chunks = [];
+            for (let i = 0; i < text.length; i += chunkSize) {
+                chunks.push(text.slice(i, i + chunkSize));
+            }
+            return chunks;
+        }
+
+        function createQRCard(text, index, total) {
+            // Card Container
+            const card = document.createElement('div');
+            card.className = "bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center gap-4 animate-fade-in";
+
+            // Header (if multiple)
+            if (total > 1) {
+                const badge = document.createElement('div');
+                badge.className = "bg-slate-800 text-white text-xs font-bold px-3 py-1 rounded-full";
+                badge.textContent = `${index} / ${total}`;
+                card.appendChild(badge);
+            }
+
+            // QR Canvas
+            const canvas = document.createElement('canvas');
+            const qr = new QRious({
+                element: canvas,
+                value: text,
+                size: 250,
+                level: 'M', // ミディアムレベル（汚れに強く、データ量もそこそこ）
+                background: '#ffffff',
+                foreground: '#0f172a' // slate-900
+            });
+
+            // Image Wrapper (for rounded corners)
+            const imgWrapper = document.createElement('div');
+            imgWrapper.className = "p-2 bg-white rounded-lg border-2 border-slate-100";
+            imgWrapper.appendChild(canvas);
+            card.appendChild(imgWrapper);
+
+            // Text Preview
+            const preview = document.createElement('div');
+            preview.className = "w-full bg-slate-50 p-3 rounded-lg text-xs text-slate-500 break-all font-mono border border-slate-100";
+            preview.textContent = text.length > 50 ? text.substring(0, 50) + "..." : text;
+            card.appendChild(preview);
+
+            qrContainer.appendChild(card);
+        }
+
+        // Init
+        lucide.createIcons();
+    </script>
+
+    <style>
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .animate-fade-in {
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+    </style>
+</body>
+
+</html>
