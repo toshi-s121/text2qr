@@ -207,11 +207,12 @@
 
                 // Canvas
                 const canvas = document.createElement('canvas');
-                canvas.className = 'max-w-full h-auto shadow-sm rounded-lg border border-slate-100'; // Style
+                // Canvasが親要素からはみ出さないようにサイズ制限を追加
+                canvas.className = 'max-w-full max-h-[65%] w-auto h-auto object-contain shadow-sm rounded-lg border border-slate-100';
 
                 QRCode.toCanvas(canvas, text, {
                     width: 500,
-                    margin: 1,
+                    margin: 4, // 余白を4に変更
                     errorCorrectionLevel: 'L'
                 }, function (error) {
                     if (error) console.error(error);
