@@ -191,11 +191,12 @@
 
             // QR Canvas
             const canvas = document.createElement('canvas');
+            canvas.className = 'max-w-full h-auto'; // レスポンシブ対応（高解像度で生成して縮小表示）
             const qr = new QRious({
                 element: canvas,
                 value: text,
-                size: 250,
-                level: 'M', // ミディアムレベル（汚れに強く、データ量もそこそこ）
+                size: 500, // 高解像度化
+                level: 'L', // 密度を下げるためにレベルを低に変更 (M->L)
                 background: '#ffffff',
                 foreground: '#0f172a' // slate-900
             });
