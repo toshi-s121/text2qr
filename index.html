@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Text2QR - 長文分割対応</title>
+    <title>Text2QR - スライド表示対応</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
@@ -26,16 +26,6 @@
             padding-top: env(safe-area-inset-top);
             padding-bottom: env(safe-area-inset-bottom);
         }
-
-        /* スクロールバー非表示（スッキリさせるため） */
-        .no-scrollbar::-webkit-scrollbar {
-            display: none;
-        }
-
-        .no-scrollbar {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-        }
     </style>
 </head>
 
@@ -48,11 +38,11 @@
                 <i data-lucide="qr-code" class="w-5 h-5 text-indigo-600"></i>
                 Text2QR
             </h1>
-            <div class="text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-1 rounded">長文対応</div>
+            <div class="text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-1 rounded">スライド式</div>
         </div>
     </header>
 
-    <main class="flex-1 max-w-md mx-auto w-full p-4 space-y-6">
+    <main class="flex-1 max-w-md mx-auto w-full p-4 space-y-6 pb-20">
 
         <!-- Input Area -->
         <section class="space-y-2">
@@ -61,7 +51,7 @@
                 <span id="char-count" class="text-xs text-slate-400 font-normal">0 文字</span>
             </label>
             <div class="relative group">
-                <textarea id="text-input" rows="4"
+                <textarea id="text-input" rows="3"
                     class="w-full text-base bg-white border-2 border-slate-200 rounded-xl p-4 focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50/50 transition resize-none shadow-sm"
                     placeholder="ここに文章を貼り付けてください..."></textarea>
                 <div class="absolute bottom-3 right-3 flex gap-2">
@@ -77,7 +67,7 @@
             </div>
             <p class="text-xs text-slate-400">
                 <i data-lucide="info" class="w-3 h-3 inline align-middle mr-0.5"></i>
-                約500文字を超えると、自動的に複数のQRコードに分割されます。
+                約300文字ごとに分割して表示します。
             </p>
         </section>
 
@@ -88,20 +78,42 @@
             QRコード生成
         </button>
 
-        <!-- Result Area -->
-        <section id="result-area" class="hidden space-y-4 pb-10">
+        <!-- Result Area (Carousel) -->
+        <section id="result-area" class="hidden space-y-4">
             <div class="flex items-center gap-2 px-1">
                 <span class="h-px bg-slate-200 flex-1"></span>
                 <span class="text-xs font-bold text-slate-400">GENERATED</span>
                 <span class="h-px bg-slate-200 flex-1"></span>
             </div>
 
-            <div id="qr-container" class="space-y-6">
-                <!-- JSでここにQRカードを追加 -->
+            <!-- Carousel Display -->
+            <div
+                class="relative bg-white rounded-3xl shadow-lg border border-slate-100 overflow-hidden aspect-square flex flex-col">
+                <!-- QR Card Content -->
+                <div id="qr-card-content"
+                    class="w-full h-full p-4 pb-20 flex flex-col items-center justify-center gap-2 transition-opacity duration-300">
+                    <!-- JSで描画 -->
+                </div>
+
+                <!-- Navigation Controls -->
+                <div id="nav-controls"
+                    class="absolute bottom-0 left-0 right-0 h-16 bg-white/90 backdrop-blur-sm border-t border-slate-100 flex items-center justify-between px-6">
+                    <button onclick="prevSlide()" id="btn-prev"
+                        class="p-2 text-slate-400 hover:text-indigo-600 transition disabled:opacity-30 disabled:hover:text-slate-400">
+                        <i data-lucide="chevron-left" class="w-6 h-6"></i>
+                    </button>
+
+                    <span id="page-indicator" class="font-mono font-bold text-slate-600">1 / 1</span>
+
+                    <button onclick="nextSlide()" id="btn-next"
+                        class="p-2 text-slate-400 hover:text-indigo-600 transition disabled:opacity-30 disabled:hover:text-slate-400">
+                        <i data-lucide="chevron-right" class="w-6 h-6"></i>
+                    </button>
+                </div>
             </div>
 
             <div class="text-center">
-                <p class="text-xs text-slate-400 mb-2">QRコードを長押しして画像を保存できます</p>
+                <p class="text-xs text-slate-400 mb-2">長押しで画像を保存できます</p>
             </div>
         </section>
 
@@ -109,13 +121,20 @@
 
     <script>
         // --- Config ---
-        const MAX_CHARS_PER_QR = 500; // ユーザー要望により500文字に変更
+        const MAX_CHARS_PER_QR = 300; // 300文字に変更
+
+        // --- State ---
+        let chunks = [];
+        let currentIndex = 0;
 
         // --- Elements ---
         const textInput = document.getElementById('text-input');
         const charCount = document.getElementById('char-count');
         const resultArea = document.getElementById('result-area');
-        const qrContainer = document.getElementById('qr-container');
+        const qrCardContent = document.getElementById('qr-card-content');
+        const pageIndicator = document.getElementById('page-indicator');
+        const btnPrev = document.getElementById('btn-prev');
+        const btnNext = document.getElementById('btn-next');
 
         // --- Event Listeners ---
         textInput.addEventListener('input', updateCount);
@@ -124,8 +143,6 @@
         function updateCount() {
             const len = textInput.value.length;
             charCount.textContent = `${len} 文字`;
-
-            // 簡易的な自動生成（入力が止まったら...は今回は省略、UX向上のためボタン起動にする）
         }
 
         async function pasteText() {
@@ -142,7 +159,7 @@
             textInput.value = '';
             updateCount();
             resultArea.classList.add('hidden');
-            qrContainer.innerHTML = '';
+            chunks = [];
         }
 
         function generateQR() {
@@ -152,17 +169,13 @@
                 return;
             }
 
-            // Reset
-            qrContainer.innerHTML = '';
+            // Split Text
+            chunks = splitText(text, MAX_CHARS_PER_QR);
+            currentIndex = 0;
+
+            // Show UI
             resultArea.classList.remove('hidden');
-
-            const chunks = splitText(text, MAX_CHARS_PER_QR);
-
-            chunks.forEach((chunk, index) => {
-                createQRCard(chunk, index + 1, chunks.length);
-            });
-
-            lucide.createIcons();
+            renderCurrentSlide();
 
             // Scroll to result
             resultArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -176,69 +189,68 @@
             return chunks;
         }
 
-        function createQRCard(text, index, total) {
-            // Card Container
-            const card = document.createElement('div');
-            card.className = "bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center gap-4 animate-fade-in";
+        function renderCurrentSlide() {
+            const text = chunks[currentIndex];
+            const total = chunks.length;
 
-            // Header (if multiple)
-            if (total > 1) {
-                const badge = document.createElement('div');
-                badge.className = "bg-slate-800 text-white text-xs font-bold px-3 py-1 rounded-full";
-                badge.textContent = `${index} / ${total}`;
-                card.appendChild(badge);
+            // Update Controls
+            pageIndicator.textContent = `${currentIndex + 1} / ${total}`;
+            btnPrev.disabled = currentIndex === 0;
+            btnNext.disabled = currentIndex === total - 1;
+
+            // Fade Out
+            qrCardContent.style.opacity = '0';
+
+            setTimeout(() => {
+                // Render Content
+                qrCardContent.innerHTML = '';
+
+                // Canvas
+                const canvas = document.createElement('canvas');
+                canvas.className = 'max-w-full h-auto shadow-sm rounded-lg border border-slate-100'; // Style
+
+                QRCode.toCanvas(canvas, text, {
+                    width: 500,
+                    margin: 1,
+                    errorCorrectionLevel: 'L'
+                }, function (error) {
+                    if (error) console.error(error);
+                });
+
+                qrCardContent.appendChild(canvas);
+
+                // Text Preview
+                const preview = document.createElement('div');
+                preview.className = "w-full bg-slate-50 p-3 rounded-lg text-xs text-slate-500 break-all font-mono border border-slate-100 text-center";
+                // Show first few chars + ...
+                const cleanText = text.replace(/\n/g, ' ');
+                preview.textContent = cleanText.length > 40 ? cleanText.substring(0, 40) + "..." : cleanText;
+
+                qrCardContent.appendChild(preview);
+
+                // Fade In
+                qrCardContent.style.opacity = '1';
+                lucide.createIcons();
+            }, 150); // Short delay for transition
+        }
+
+        function prevSlide() {
+            if (currentIndex > 0) {
+                currentIndex--;
+                renderCurrentSlide();
             }
+        }
 
-            // QR Canvas
-            const canvas = document.createElement('canvas');
-            canvas.className = 'max-w-full h-auto'; // レスポンシブ対応
-
-            // QRCode Library (node-qrcode) を使用
-            QRCode.toCanvas(canvas, text, {
-                width: 500,
-                margin: 2,
-                errorCorrectionLevel: 'L'
-            }, function (error) {
-                if (error) console.error(error);
-                console.log('QR code generated!');
-            });
-
-            // Image Wrapper (for rounded corners)
-            const imgWrapper = document.createElement('div');
-            imgWrapper.className = "p-2 bg-white rounded-lg border-2 border-slate-100";
-            imgWrapper.appendChild(canvas);
-            card.appendChild(imgWrapper);
-
-            // Text Preview
-            const preview = document.createElement('div');
-            preview.className = "w-full bg-slate-50 p-3 rounded-lg text-xs text-slate-500 break-all font-mono border border-slate-100";
-            preview.textContent = text.length > 50 ? text.substring(0, 50) + "..." : text;
-            card.appendChild(preview);
-
-            qrContainer.appendChild(card);
+        function nextSlide() {
+            if (currentIndex < chunks.length - 1) {
+                currentIndex++;
+                renderCurrentSlide();
+            }
         }
 
         // Init
         lucide.createIcons();
     </script>
-
-    <style>
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .animate-fade-in {
-            animation: fadeIn 0.4s ease-out forwards;
-        }
-    </style>
 </body>
 
 </html>
