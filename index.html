@@ -9,8 +9,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- QR Code Library -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+    <!-- QR Code Library (node-qrcode: 日本語UTF-8対応) -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
     <!-- Google Fonts -->
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap"
@@ -191,14 +191,16 @@
 
             // QR Canvas
             const canvas = document.createElement('canvas');
-            canvas.className = 'max-w-full h-auto'; // レスポンシブ対応（高解像度で生成して縮小表示）
-            const qr = new QRious({
-                element: canvas,
-                value: text,
-                size: 500, // 高解像度化
-                level: 'L', // 密度を下げるためにレベルを低に変更 (M->L)
-                background: '#ffffff',
-                foreground: '#0f172a' // slate-900
+            canvas.className = 'max-w-full h-auto'; // レスポンシブ対応
+
+            // QRCode Library (node-qrcode) を使用
+            QRCode.toCanvas(canvas, text, {
+                width: 500,
+                margin: 2,
+                errorCorrectionLevel: 'L'
+            }, function (error) {
+                if (error) console.error(error);
+                console.log('QR code generated!');
             });
 
             // Image Wrapper (for rounded corners)
